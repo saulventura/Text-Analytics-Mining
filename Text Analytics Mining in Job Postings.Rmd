@@ -1,0 +1,542 @@
+---
+title: "Text Analytics/Mining in Job Postings" 
+
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+ 
+author: "Saul Ventura"
+date: "Last update: `r format(Sys.time(), '%d %B, %Y')`" 
+output:
+  html_document:
+    toc: true
+    toc_float: 
+        collapsed: true
+        smooth_scroll: true
+    toc_depth: 3
+    fig_caption: yes
+    code_folding: hide
+    number_sections: true
+    theme: cerulean  # many options for themes
+    highlight: tango  # specifies the syntax highlighting style
+
+fontsize: 14pt
+
+---
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 12px;
+  }
+td {  /* Table  */
+  font-size: 8px;
+}
+h1.title {
+  font-size: 38px;
+  color: #228200;
+}
+h1 { /* Header 1 */
+  font-size: 28px;
+  color: #228200;
+}
+h2 { /* Header 2 */
+    font-size: 22px;
+  color: #228200;
+}
+h3 { /* Header 3 */
+  font-size: 18px;
+  font-family: "Times New Roman", Times, serif;
+  color: #228200;
+}
+code.r{ /* Code block */
+    font-size: 12px;
+}
+pre { /* Code block - determines code spacing between lines */
+    font-size: 14px;
+}
+
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #228200;
+    color:white;
+}
+
+</style>
+
+
+<center><img src="header_graph.jpg" width="50%" height="40%" ></center>
+
+
+
+# Introduction
+ 
+## Overview
+In this project, We will analyze a dataset composed by job postings in order to discover useful information regarding a specific job title through various text analytics techniques. 
+The job title and the location associated with it, used to gather the job posting descriptions, were Data Scientist and Los Angeles respectively. All job postings were filtered by date: January 2019.
+Techniques used were tokenization, stemming, lemmatization, n-gram, and so on.
+
+
+## Purpose
+The main purpose of this project is to gain insights that can help job applicants to be familiar with what the organizations are looking for in terms of data scientist positions located in Los Angeles area.
+
+## High level approach
+
+
+<center><img src="TextAnalyticsProcess.jpg" width="70%" height="70%" ></center>
+
+
+# Data Collection
+
+## Library import
+Loading libraries for **data cleaning, processing & visualization...**
+
+```{r setting, eval=TRUE, warning = FALSE, message=FALSE}
+
+# There are a range of packages in R for doing text analysis. These include:
+# 
+# hunspell - Tools for spelling, stemming, and tokenization.
+# SnowballC - Tools for stemming in a range of languages.
+# stringr - Tools for cleaning individual strings (e.g. trimming whitespace).
+# text2vec - Tools for tools for text vectorization, topic modeling, and more.
+# tidytext - Tools for word processing, sentiment analysis, and tidying text.
+# tm - A framework for text mining.
+
+
+
+library(tm)
+library(tmap)
+library(SnowballC)
+library(ggplot2)
+library(DT)
+library(plyr)
+library(tibble)
+library(RColorBrewer)
+library(wordcloud)
+library(stringr)
+
+```
+
+
+## Data Loading
+Loading  **Job posting dataset...**
+```{r loading2, eval=TRUE , warning = FALSE, message=FALSE}
+
+# 1.1 Setting my working directory in R
+setwd("C:/Saul/Portfolio/Text Analytics") 
+# 1.2 Reading the dataset
+
+data.text  <- read.csv("DataScientistjobs.csv")  
+
+```
+
+## Data Exploring
+```{r exploring, eval=TRUE , warning = TRUE, message=FALSE}
+
+# 2.1 Data structure review
+#str(data.trx)
+# 2.2 Data preview
+
+```
+Checking a **sample data...**
+```{r exploring0, fig.height=6, fig.cap ="" , eval=TRUE , warning = FALSE, message=FALSE}
+
+datatable(data.text[(1:20),], filter = 'top', options = list(
+  pageLength = 5, scrollX = TRUE, scrollY = "300px", autoWidth = TRUE))
+
+```
+
+# Creating a Corpus
+
+## Processes
+Performing <span style="color:red">cleansing, formatting, normalization,...</span>
+```{r preparation, eval=TRUE , warning = FALSE, message=FALSE}
+
+# Create corpus
+
+corpus = Corpus(VectorSource(data.text$Description))
+
+# Look at corpus
+corpus
+
+
+
+# Convert to lower-case
+corpus = tm_map(corpus, tolower)
+# Remove punctuation
+corpus = tm_map(corpus, removePunctuation)
+# Look at stop words 
+corpus = tm_map(corpus, removeWords, c(stopwords("en"),"will","etc","build","using"))
+
+corpus <- tm_map(corpus, stripWhitespace)
+
+corpus = tm_map(corpus, str_replace_all,"[^[:alnum:]]", " ")
+
+
+
+
+#this below step is crucial, since it converts the list into an atomic matrix.
+corpustdm <-TermDocumentMatrix(corpus)
+corpustdm
+as.matrix(corpustdm)
+
+
+#document id's appearing as character(0), which is annoying me, so changing it.
+#creating a vector of files names
+
+#after this, we need to convert this into traditional matrix.
+m <- as.matrix(corpustdm)
+corpusdf <- data.frame(m)
+
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+
+corpusdf <- rownames_to_column(corpusdf)
+corpusdf <- rename(corpusdf, c("rowname"="word"))
+corpusdf$wordcount <- rowSums(corpusdf[-1])
+corpusdf <- corpusdf[order(-corpusdf$wordcount),]
+#religioustextsdf <- religioustextsdf %>%
+ # arrange(desc(wordcount))
+
+#since all the rows are same and numeric,we can add them up to get the total value
+#sort it based on the number
+
+pal <- brewer.pal(9,"RdYlGn")
+pal <- pal[-(1:2)]
+
+set.seed(142)
+wordcloud(word=corpusdf$word, freq= corpusdf$wordcount,  colors = brewer.pal(6, "Dark2"), random.order=FALSE, rot.per= 0.35, max.words = 150)
+
+#plotting words which have more than a count of 1000
+ggplot(subset(corpusdf, wordcount>30), aes(reorder(word, -wordcount), wordcount)) +
+  geom_bar(stat="identity") +
+  xlab("Words with the highest frequency") +
+  ylab("Frequency") +
+  ggtitle("Understanding word frequencies") +
+  theme(axis.text.x=element_text(angle=90, hjust=0.9))
+
+
+barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,
+        col ="lightgreen", main ="Most frequent words",
+        ylab = "Word frequencies")
+
+
+
+#Hierarchal Clustering
+#First calculate distance between words & then cluster them according to similarity.
+library(cluster)   
+d <- dist(corpustdm, method="euclidian")   
+fit <- hclust(d=d, method="ward.D")   # for a different look try substituting: method="ward.D"
+
+fit 
+
+plot(fit, hang=-1) 
+
+
+
+
+library(udpipe)
+library(lattice)
+
+
+ud_model <- udpipe_download_model(language = "english")
+ud_model <- udpipe_load_model(ud_model$file_model)
+x <- udpipe_annotate(ud_model, x = data.text$Description, doc_id = data.text$Company)
+x <- as.data.frame(x)
+
+
+stats <- txt_freq(x$upos)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+barchart(key ~ freq, data = stats, col = "lightgreen", 
+         main = "UPOS (Universal Parts of Speech)\n frequency of occurrence", 
+         xlab = "Freq")
+
+## ADJECTIVES
+stats <- subset(x, upos %in% c("ADJ")) 
+stats <- txt_freq(stats$token)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+barchart(key ~ freq, data = head(stats, 20), col = "purple", 
+         main = "Most occurring adjectives", xlab = "Freq")
+
+## NOUNS
+stats <- subset(x, upos %in% c("VERB")) 
+stats <- txt_freq(stats$token)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+barchart(key ~ freq, data = head(stats, 20), col = "gold", 
+         main = "Most occurring Verbs", xlab = "Freq")
+
+
+## Using RAKE
+#Rapid Automatic Keyword Extraction (RAKE) is an algorithm to automatically extract keywords from documents.
+#More info on https://www.thinkinfi.com/2018/09/keyword-extraction-using-rake-in-python.html
+
+stats <- keywords_rake(x = x, term = "lemma", group = "doc_id", 
+                       relevant = x$upos %in% c("NOUN", "ADJ"))
+stats$key <- factor(stats$keyword, levels = rev(stats$keyword))
+barchart(key ~ rake, data = head(subset(stats, freq > 3), 20), col = "red", 
+         main = "Keywords identified by RAKE", 
+         xlab = "Rake")
+
+
+## Using a sequence of POS tags (noun phrases / verb phrases)
+x$phrase_tag <- as_phrasemachine(x$upos, type = "upos")
+stats <- keywords_phrases(x = x$phrase_tag, term = tolower(x$token), 
+                          pattern = "(A|N)*N(P+D*(A|N)*N)*", 
+                          is_regex = TRUE, detailed = FALSE)
+stats <- subset(stats, ngram > 1 & freq > 3)
+stats$key <- factor(stats$keyword, levels = rev(stats$keyword))
+barchart(key ~ freq, data = head(stats, 20), col = "magenta", 
+         main = "Keywords - simple noun phrases", xlab = "Frequency")
+
+```
+
+## Output {.tabset}
+
+### Money Spent by Customers
+
+```{r output1, eval=TRUE , warning = FALSE, message=FALSE}
+
+
+```
+
+### Days Since Last Purchase
+
+```{r output2, eval=TRUE , warning = FALSE, message=FALSE}
+
+
+```
+
+### Number of Purchases
+
+```{r output3, eval=TRUE , warning = FALSE, message=FALSE}
+
+
+```
+
+# Data Modeling
+
+##K-Means
+<center><img src="kmeans.png"></center>
+
+Basically, <span style="color:red">it works like this...</span>
+<center><img src="kmeansani.gif"></center>
+
+```{r modeling1, eval=TRUE , warning = FALSE, message=FALSE , include = FALSE}
+#ANIMATION
+# set.seed(2345)
+# library(animation)
+# ani.options(interval = 0.05)
+# kmeans.ani(preprocessed[1:2], centers =3)
+```
+##Cluster Definition
+```{r modeling2, eval=TRUE , warning = FALSE, message=FALSE}
+
+# 4.1 Elbow method
+
+set.seed(123)
+# Compute and plot wss for k = 2 to k = 15
+# k.max <- 15 # Maximal number of clusters
+# data <- customer.data[,2:4]
+# wss <- sapply(1:k.max,
+#               function(k){kmeans(data, k, nstart=10 )$tot.withinss})
+# plot(1:k.max, wss,
+#      type="b", pch = 19, frame = FALSE,
+#      xlab="Number of clusters K",
+#      ylab="Total within-clusters sum of squares")
+# abline(v = 4, lty =2,col="royalblue")
+
+
+# 4.2 Average Silhouette method
+
+library(cluster)
+# k.max <- 10
+# data <- customer.data[,2:4]
+# sil <- rep(0, k.max)
+# # Compute the average silhouette width for
+# # k = 2 to k = 15
+# for(i in 2:k.max){
+#   km.res <- kmeans(data, centers = i, nstart = 25)
+#   ss <- silhouette(km.res$cluster, dist(data))
+#   sil[i] <- mean(ss[, 3])
+# }
+
+# Plot the  average silhouette width
+# plot(1:k.max, sil, type = "b", pch = 19,
+#      frame = FALSE, xlab = "Number of clusters k")
+# abline(v = which.max(sil), lty = 2)
+
+
+# 4.3 Gap Statistic method
+# set.seed(123)
+# data <- customer.data[,2:4]
+# gap_stat <- clusGap(data, FUN = kmeans, nstart = 25,K.max = 10, B = 50)
+# fviz_gap_stat(gap_stat)
+
+
+# 4.4 Using 30 different indexes
+# set.seed(123)
+# data <- customer.data[,2:4]
+# res <- NbClust(data, diss=NULL, distance = "euclidean", min.nc=2, max.nc=10, method = "kmeans" , index = "all")
+# fviz_nbclust(res) + theme_minimal()
+
+
+```
+##Processing
+```{r modeling3, eval=TRUE , warning = FALSE, message=FALSE}
+
+
+
+# 
+# # 5. K-MEAN CLUSTERING
+# 
+# 5.1 fit the model and get cluster means
+# set.seed(123)
+# data <- customer.data[,6:8]
+# fit <- kmeans(data, 5, nstart = 20) 
+# aggregate(customer.data[,2:4],by=list(fit$cluster),FUN=mean) 
+# 
+# # 5.2 Display cluster centers and give a count of data points in each cluster
+# #fit$centers 
+# table(fit$cluster) 
+
+
+
+
+```
+
+# Results
+
+##2D plot
+```{r results1, eval=TRUE , warning = FALSE, message=FALSE }
+
+# 5.3 Plot the model
+#clusplot(data, fit$cluster, color=TRUE, shade=TRUE, Expllabels=2, lines=0)
+
+# fviz_cluster(fit, data = data)
+# 
+# 
+# # Add cluster membership to customers dataset
+# customer.data$cluster <- fit$cluster
+# customer.data$cluster  <- factor(customer.data$cluster, levels = c(1:5))
+
+##2D plot
+```
+##3D plot
+```{r results2, eval=TRUE , warning = FALSE, message=FALSE }
+
+#######################
+# Plot clusters in 3D #
+#######################
+# 
+# colors <- c('red','orange','green3','deepskyblue','blue','darkorchid4','violet','pink1','tan3','black')
+# scatter3d(x = customer.data$number.pur.z, 
+#           y = customer.data$money.spent.z,
+#           z = customer.data$days.sl.pur.z, 
+#           groups = customer.data$cluster,
+#           xlab = "Frequency (z)", 
+#           ylab = "Monetary Value (z)",
+#           zlab = "Recency (z)",
+#           surface.col = colors,
+#           box=FALSE,angle =80,
+#           axis.scales = FALSE,
+#           surface = TRUE, # produces the horizonal planes through the graph at each level of monetary value
+#           fit = "smooth",
+#           #     ellipsoid = TRUE, # to graph ellipses uses this command and set "surface = " to FALSE
+#           grid = TRUE,
+#           axis.col = c("black", "black", "black"))
+# 
+# 
+# 
+# 
+# 
+# scatter3d(x = customer.data$money.spent.z, 
+#           y = customer.data$number.pur.z,
+#           z = customer.data$days.sl.pur.z,
+#           groups = customer.data$cluster,
+#           xlab = "Monetary Value (z)", 
+#           ylab = "Frequency (z)",
+#           zlab = "Recency (z)",
+#           surface.col = colors,
+#           axis.scales = FALSE,
+#           surface = TRUE, # produces the horizonal planes through the graph at each level of monetary value
+#           fit = "smooth",
+#           #     ellipsoid = TRUE, # to graph ellipses uses this command and set "surface = " to FALSE
+#           grid = TRUE,
+#           axis.col = c("black", "black", "black"))
+
+
+```
+
+<center><img src="3d1.png" width="70%" and height="70%"  align="middle"></center>
+
+##Labeling
+```{r labeling, eval=TRUE , warning = FALSE, message=FALSE }
+# 
+# count_cluster <- as.data.frame(table(fit$cluster))
+# colnames (count_cluster ) <- c("Group.1","Customers")
+# df <- aggregate(customer.data[,2:4],by=list(fit$cluster),FUN=mean) 
+# df <- merge (df, count_cluster, by = "Group.1")
+# 
+# 
+# colnames (df) <- c("Cluster","Days since last purchase","Number of purchases","Money spent","Customers")
+# df$`Days since last purchase` <- round(df$`Days since last purchase`)
+# df$`Number of purchases` <- round(df$`Number of purchases` )
+# df$`Money spent` <- round(df$`Money spent`)
+# 
+# d <- head(df)
+# 
+# tt3 <- ttheme_minimal(
+#   core=list(bg_params = list(fill = blues9[1:4], col=NA),
+#             fg_params=list(fontface=3)),
+#   colhead=list(fg_params=list(col="navyblue", fontface=4L)),
+#   rowhead=list(fg_params=list(col="orange", fontface=3L)))
+# 
+# 
+# grid.arrange(tableGrob(d, theme=tt3), nrow=1)
+
+
+```
+
+##Findings
+<center><img src="findings.png" ></center>
+
+```{r labeling3, eval=TRUE , warning = FALSE, message=FALSE }
+# test
+
+```
+
+#What is Next
+
++ **<span style="color:red">Explore more variables: first day of purchase, spent per category...</span>**
++ **<span style="color:red">Inventory segmentation</span>**
++ **<span style="color:red">Qualify the Suppliers</span>**
++ **<span style="color:red">Employee profiles</span>**
+
+```{r next, eval=TRUE , warning = FALSE, message=FALSE }
+
+
+```
+
+#References
+
++ Ando K. (2018). Cluster Analysis of Whisky Reviews using k-means. Retrieved from https://www.kaggle.com/koki25ando/cluster-analysis-of-whisky-reviews-using-k-means
++ Black J. (n.d.). 3D scatter plot in R. Retrieved from https://epijim.uk/code-snippets/3Dscatter/
++ Bukun (2018). A Forty Kaggler. Retrieved from https://www.kaggle.com/ambarish/a-forty-kaggler
++ Chen D. (2012). Data mining for the online retail industry: A case study of RFM model-based customer segmentation using data mining. Journal of Database Marketing & Customer Strategy Management. Vol 19(3). 
++ Fox J. (n.d.). Three-Dimensional Scatterplots And Point Identification. Retrieved from https://www.rdocumentation.org/packages/car/versions/3.0-2/topics/scatter3d
++ GSD (2018). Who is a data scientist ?-A statistical approach. Retrieved from https://www.kaggle.com/gsdeepakkumar/who-is-a-data-scientist-a-statistical-approach
++ Hill A. (2018). 9 Useful R Data Visualization Packages for Any Discipline. Retrieved from https://blog.modeanalytics.com/r-data-visualization-packages/
++ Hirst T. (2015). Doodling With 3d Animated Charts in R. Retrieved from https://www.r-bloggers.com/doodling-with-3d-animated-charts-in-r/
++ Kassambara (2018). Cluster Analysis in R Simplified and Enhanced. Retrieved from https://www.datanovia.com/en/blog/cluster-analysis-in-r-simplified-and-enhanced/
++ Putler (n.d.). RFM Analysis For Successful Customer Segmentation. Retrieved from https://www.putler.com/rfm-analysis/#summary
++ Qiao F . (2018). Data Exploration and Visualization with R & ggplot. Retrieved from https://towardsdatascience.com/data-exploration-and-visualization-with-r-ggplot-7f33c10ec1c
++ Rezaeian A. (2016). Measuring Customers Satisfaction of ECommerce Sites Using Clustering Techniques: Case Study of Nyazco Website. International Journal of Management, Accounting and Economics. Vol 3(1).
++ Sarkar D. (2018). The Art of Effective Visualization of Multi-dimensional Data. Retrieved from https://towardsdatascience.com/the-art-of-effective-visualization-of-multi-dimensional-data-6c7202990c57
++ Stackoverflwo (2016). How to add table of contents in Rmarkdown?. Retrieved from https://stackoverflow.com/questions/23957278/how-to-add-table-of-contents-in-rmarkdown
+
+
+```{r references, eval=TRUE , warning = FALSE, message=FALSE }
+
+```
+
+
