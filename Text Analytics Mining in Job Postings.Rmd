@@ -1,11 +1,6 @@
 ---
 title: "Text Analytics/Mining in Job Postings" 
 
-knit: (function(input_file, encoding) {
-  out_dir <- 'docs';
-  rmarkdown::render(input_file,
- encoding=encoding,
- output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
  
 author: "Saul Ventura"
 date: "Last update: `r format(Sys.time(), '%d %B, %Y')`" 
@@ -316,10 +311,9 @@ barchart(key ~ freq, data = head(stats, 20), col = "magenta",
 # Data Modeling
 
 ##K-Means
-<center><img src="kmeans.png"></center>
 
 Basically, <span style="color:red">it works like this...</span>
-<center><img src="kmeansani.gif"></center>
+
 
 ```{r modeling1, eval=TRUE , warning = FALSE, message=FALSE , include = FALSE}
 #ANIMATION
@@ -467,7 +461,6 @@ library(cluster)
 
 ```
 
-<center><img src="3d1.png" width="70%" and height="70%"  align="middle"></center>
 
 ##Labeling
 ```{r labeling, eval=TRUE , warning = FALSE, message=FALSE }
@@ -498,7 +491,7 @@ library(cluster)
 ```
 
 ##Findings
-<center><img src="findings.png" ></center>
+
 
 ```{r labeling3, eval=TRUE , warning = FALSE, message=FALSE }
 # test
