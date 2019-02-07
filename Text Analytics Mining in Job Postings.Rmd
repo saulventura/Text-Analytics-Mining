@@ -72,7 +72,7 @@ pre { /* Code block - determines code spacing between lines */
 # Introduction
  
 ## Overview
-In this project, We will analyze a dataset composed by job postings in order to discover useful information regarding a specific job title through various text analytics techniques. 
+In this project, we will analyze a dataset composed by job postings in order to discover useful information regarding a specific job title through various text analytics techniques. 
 The job title and the location associated with it, used to gather the job posting descriptions, were Data Scientist and Los Angeles respectively. All job postings were filtered by date: January 2019.
 Techniques used were tokenization, stemming, lemmatization, n-gram, and so on.
 
@@ -89,7 +89,7 @@ The main purpose of this project is to gain insights that can help job applicant
 # Data Collection
 
 ## Library import
-Loading libraries for **data cleaning, processing & visualization...**
+Loading libraries for this project life cycle: **data cleaning, processing & visualization...**
 
 ```{r setting, eval=TRUE, warning = FALSE, message=FALSE}
 
@@ -101,8 +101,7 @@ Loading libraries for **data cleaning, processing & visualization...**
 # text2vec - Tools for tools for text vectorization, topic modeling, and more.
 # tidytext - Tools for word processing, sentiment analysis, and tidying text.
 # tm - A framework for text mining.
-
-
+Sys.setenv(JAVA_HOME='C:\\Program Files (x86)\\Java\\jre1.8.0_45') # for 32-bit version
 
 library(tm)
 library(tmap)
@@ -114,6 +113,12 @@ library(tibble)
 library(RColorBrewer)
 library(wordcloud)
 library(stringr)
+library(textstem)
+library(RWeka)
+library(qdap)
+library(RColorBrewer)
+library(udpipe)
+library(lattice)
 
 ```
 
@@ -122,20 +127,23 @@ library(stringr)
 Loading  **Job posting dataset...**
 ```{r loading2, eval=TRUE , warning = FALSE, message=FALSE}
 
-# 1.1 Setting my working directory in R
+# Setting my working directory in R
 setwd("C:/Saul/Portfolio/Text Analytics") 
-# 1.2 Reading the dataset
+# Reading the dataset
 
 data.text  <- read.csv("DataScientistjobs.csv")  
+data.tools  <- read.csv("Tools.csv") 
+
+#yy <- matrix(t(as.matrix(as.data.frame(t(data.tools)))), nrow = 1)
 
 ```
 
 ## Data Exploring
 ```{r exploring, eval=TRUE , warning = TRUE, message=FALSE}
 
-# 2.1 Data structure review
-#str(data.trx)
-# 2.2 Data preview
+#  Data structure review
+#  str(data.text)
+#  Data preview
 
 ```
 Checking a **sample data...**
@@ -148,43 +156,68 @@ datatable(data.text[(1:20),], filter = 'top', options = list(
 
 # Creating a Corpus
 
-## Processes
-Performing <span style="color:red">cleansing, formatting, normalization,...</span>
+## Corpus Preparation
+The next step is to transform the dataset into a text document **using the function Corpus** that belongs to the **TM package**.
+Corpus is a function that takes a text document as input and returns a text document (a character vector).
+[Read more about TM.](https://cran.r-project.org/web/packages/tm/tm.pdf){target="_blank"}
+
 ```{r preparation, eval=TRUE , warning = FALSE, message=FALSE}
 
 # Create corpus
-
 corpus = Corpus(VectorSource(data.text$Description))
-
 # Look at corpus
-corpus
+print(corpus)
+
+```
+
+# Pre-Processing
+Once we have a corpus, then we need to modify the documents in it, e.g., puntuaction removal, stemming, stopword removal, etcetera.
+
+```{r pre-processing, eval=TRUE , warning = FALSE, message=FALSE}
+
+cleanCorpus <- function(corpus){
+  # Converting to lower-case
+  corpus.cleaned <- tm_map(corpus, tolower)
+  # Removing punctuation
+  corpus.cleaned <- tm_map(corpus.cleaned, removePunctuation)
+  # Looking at stop words 
+  v_stopwords <- c(stopwords("en"),"will","etc","build","using")
+  corpus.cleaned <- tm_map(corpus.cleaned, removeWords,v_stopwords )
+  #Eliminating extra whitespace
+  corpus.cleaned <- tm_map(corpus.cleaned, stripWhitespace)
+  #Removing numbers
+  corpus.cleaned <- tm_map(corpus.cleaned, removeNumbers)
+  #Stemming/Lemmatizing document 
+  #corpus.cleaned <- tm_map(corpus.cleaned, lemmatize_strings)
+  #Removing special characters 
+  corpus.cleaned <- tm_map(corpus.cleaned, str_replace_all,"[^[:alnum:]]", " ")
+  #corpus[[1]]$content
+  return(corpus.cleaned)
+}
+corpus <- cleanCorpus(corpus)
 
 
+```
 
-# Convert to lower-case
-corpus = tm_map(corpus, tolower)
-# Remove punctuation
-corpus = tm_map(corpus, removePunctuation)
-# Look at stop words 
-corpus = tm_map(corpus, removeWords, c(stopwords("en"),"will","etc","build","using"))
+# Creating a TDM
+Now let's create a Term Document Matrix (TDM). A term-document matrix is a mathematical matrix that describes the frequency of terms that occur in a collection of documents.
+[This video concisely explains what TDM is.](https://www.youtube.com/watch?v=dE10fBCDWQc){target="_blank"} 
 
-corpus <- tm_map(corpus, stripWhitespace)
+# Convert corpus into TDM
 
-corpus = tm_map(corpus, str_replace_all,"[^[:alnum:]]", " ")
+```{r tdm, eval=TRUE , warning = FALSE, message=FALSE}
 
-
-
-
-#this below step is crucial, since it converts the list into an atomic matrix.
-corpustdm <-TermDocumentMatrix(corpus)
-corpustdm
-as.matrix(corpustdm)
-
-
-#document id's appearing as character(0), which is annoying me, so changing it.
-#creating a vector of files names
+#convert to document term matrix
+corpustdm <- TermDocumentMatrix(corpus)
+#print(corpustdm) 
+#print(dimnames(corpustdm)$Terms)
+#dim(corpustdm)
 
 #after this, we need to convert this into traditional matrix.
+set.seed(43)
+colS <- colSums(as.matrix(t(corpustdm)))
+wordcloud(names(colS), colS, colors = brewer.pal(6, 'Dark2'),random.order=FALSE, rot.per= 0.35, max.words = 100)
+
 m <- as.matrix(corpustdm)
 corpusdf <- data.frame(m)
 
@@ -195,8 +228,6 @@ corpusdf <- rownames_to_column(corpusdf)
 corpusdf <- rename(corpusdf, c("rowname"="word"))
 corpusdf$wordcount <- rowSums(corpusdf[-1])
 corpusdf <- corpusdf[order(-corpusdf$wordcount),]
-#religioustextsdf <- religioustextsdf %>%
- # arrange(desc(wordcount))
 
 #since all the rows are same and numeric,we can add them up to get the total value
 #sort it based on the number
@@ -206,6 +237,19 @@ pal <- pal[-(1:2)]
 
 set.seed(142)
 wordcloud(word=corpusdf$word, freq= corpusdf$wordcount,  colors = brewer.pal(6, "Dark2"), random.order=FALSE, rot.per= 0.35, max.words = 150)
+
+
+
+```
+
+# Crea....
+
+```{r tdm1, eval=TRUE , warning = FALSE, message=FALSE}
+
+
+
+
+
 
 #plotting words which have more than a count of 1000
 ggplot(subset(corpusdf, wordcount>30), aes(reorder(word, -wordcount), wordcount)) +
@@ -222,25 +266,14 @@ barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,
 
 
 
-#Hierarchal Clustering
-#First calculate distance between words & then cluster them according to similarity.
-library(cluster)   
-d <- dist(corpustdm, method="euclidian")   
-fit <- hclust(d=d, method="ward.D")   # for a different look try substituting: method="ward.D"
-
-fit 
-
-plot(fit, hang=-1) 
 
 
 
+#ud_model <- udpipe_download_model(language = "english")
+#ud_model <- udpipe_load_model(ud_model$file_model)
+ud_model <- udpipe_load_model(file = "english-ewt-ud-2.3-181115.udpipe")
 
-library(udpipe)
-library(lattice)
 
-
-ud_model <- udpipe_download_model(language = "english")
-ud_model <- udpipe_load_model(ud_model$file_model)
 x <- udpipe_annotate(ud_model, x = data.text$Description, doc_id = data.text$Company)
 x <- as.data.frame(x)
 
@@ -288,25 +321,134 @@ stats$key <- factor(stats$keyword, levels = rev(stats$keyword))
 barchart(key ~ freq, data = head(stats, 20), col = "magenta", 
          main = "Keywords - simple noun phrases", xlab = "Frequency")
 
+
+
+
+
+library(dplyr) 
+library(tidytext)
+
+# Define bigram & trigram tokenizer 
+tokenizer_bi <- function(x){
+  NGramTokenizer(x, Weka_control(min=2, max=2))
+}
+
+tokenizer_tri <- function(x){
+  NGramTokenizer(x, Weka_control(min=3, max=3))
+}
+
+
+# Text transformations
+cleanVCorpus <- function(corpus){
+  corpus.tmp <- tm_map(corpus, removePunctuation)
+  corpus.tmp <- tm_map(corpus.tmp, stripWhitespace)
+  corpus.tmp <- tm_map(corpus.tmp, content_transformer(tolower))
+  v_stopwords <- c(stopwords("en"),"will","etc","build","using")
+  corpus.tmp <- tm_map(corpus.tmp, removeWords, v_stopwords)
+  corpus.tmp <- tm_map(corpus.tmp, removeNumbers)
+  return(corpus.tmp)
+}
+
+# Most frequent bigrams 
+frequentBigrams <- function(text){
+  s.cor <- VCorpus(VectorSource(text))
+  s.cor.cl <- cleanVCorpus(s.cor)
+  s.tdm <- TermDocumentMatrix(s.cor.cl, control=list(tokenize=tokenizer_bi))
+  s.tdm <- removeSparseTerms(s.tdm, 0.999)
+  m <- as.matrix(s.tdm)
+  word_freqs <- sort(rowSums(m), decreasing=TRUE)
+  dm <- data.frame(word=names(word_freqs), freq=word_freqs)
+  return(dm)
+}
+
+
+# Most frequent bigrams
+ep4.bigrams <- frequentBigrams(data.text$Description)[1:20,]
+ggplot(data=ep4.bigrams, aes(x=reorder(word, -freq), y=freq)) +  
+  geom_bar(stat="identity", fill="chocolate2", colour="black") +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=60, hjust=1)) +
+  labs(x="Bigram", y="Frequency")
+
+# Most frequent trigrams 
+frequentTrigrams <- function(text){
+  s.cor <- VCorpus(VectorSource(text))
+  s.cor.cl <- cleanVCorpus(s.cor)
+  s.tdm <- TermDocumentMatrix(s.cor.cl, control=list(tokenize=tokenizer_tri))
+  s.tdm <- removeSparseTerms(s.tdm, 0.999)
+  m <- as.matrix(s.tdm)
+  word_freqs <- sort(rowSums(m), decreasing=TRUE)
+  dm <- data.frame(word=names(word_freqs), freq=word_freqs)
+  return(dm)
+}
+
+# Most frequent trigrams
+ep4.Trigrams <- frequentTrigrams(data.text$Description)[1:20,]
+ggplot(data=ep4.Trigrams, aes(x=reorder(word, -freq), y=freq)) +  
+  geom_bar(stat="identity", fill="chocolate2", colour="black") +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=60, hjust=1)) +
+  labs(x="Trigram", y="Frequency")
+
+
 ```
 
 ## Output {.tabset}
 
-### Money Spent by Customers
+### Key Data Science Tools
 
 ```{r output1, eval=TRUE , warning = FALSE, message=FALSE}
+
+uniqueWords = function(text) {
+text <- strsplit(text, " |,|/|;")
+text <- lapply(text,unique)
+text <- sapply(text, function(u) paste0(u, collapse = " "))
+return(text) 
+}
+
+corpus = tm_map(corpus, content_transformer(uniqueWords))
+corpustdm_all <- as.matrix(TermDocumentMatrix(corpus,control=list(wordLengths=c(1,Inf))))
+
+freq <- rowSums(as.matrix(corpustdm_all))
+#freq[ as.character(tolower(data.tools[,])) ]
+
+m <- as.matrix(freq[ as.character(tolower(data.tools[,])) ])
+n <- as.data.frame(rownames(m))
+colnames(n) <- c("toolname")
+n$frequency <- round(as.numeric(as.character(m[,1]))/ncol(corpustdm_all),2)
+n <- na.omit(n)
+#n <- subset(n,frequency>0.1)
+n <- head(n[order(n$frequency, decreasing= T),], n = 20)
+
+mycolors = colorRampPalette(brewer.pal(name="Blues", n = 12))(20)
+#mycolors = c(brewer.pal(name="Dark2", n = 8), brewer.pal(name="Paired", n = 7))
+
+ggplot(data=n, aes(x= reorder(n$toolname,-frequency), y=n$frequency, fill = n$toolname)) +
+  geom_bar(stat="identity")+
+  scale_y_continuous(labels = scales::percent) +
+  geom_text(aes(label = paste0(frequency*100,"%")), 
+  position = position_stack(vjust = 0.5), size = 3) +
+  scale_color_manual(values = mycolors) +
+  theme(legend.position="none") +
+  labs(x = "Tools", y = "Percent") +
+  ggtitle("Top 20 Tools in Data Scientist Job Listings") + 
+  theme(plot.title = element_text(hjust=0.5)) +
+  ggpubr::rotate_x_text()
+
+
+
 
 
 ```
 
-### Days Since Last Purchase
+### D
 
 ```{r output2, eval=TRUE , warning = FALSE, message=FALSE}
 
 
 ```
 
-### Number of Purchases
+### N
 
 ```{r output3, eval=TRUE , warning = FALSE, message=FALSE}
 
@@ -315,7 +457,7 @@ barchart(key ~ freq, data = head(stats, 20), col = "magenta",
 
 # Data Modeling
 
-##K-Means
+##K
 
 Basically, <span style="color:red">it works like this...</span>
 
@@ -326,77 +468,7 @@ Basically, <span style="color:red">it works like this...</span>
 # library(animation)
 # ani.options(interval = 0.05)
 # kmeans.ani(preprocessed[1:2], centers =3)
-```
-##Cluster Definition
-```{r modeling2, eval=TRUE , warning = FALSE, message=FALSE}
 
-# 4.1 Elbow method
-
-set.seed(123)
-# Compute and plot wss for k = 2 to k = 15
-# k.max <- 15 # Maximal number of clusters
-# data <- customer.data[,2:4]
-# wss <- sapply(1:k.max,
-#               function(k){kmeans(data, k, nstart=10 )$tot.withinss})
-# plot(1:k.max, wss,
-#      type="b", pch = 19, frame = FALSE,
-#      xlab="Number of clusters K",
-#      ylab="Total within-clusters sum of squares")
-# abline(v = 4, lty =2,col="royalblue")
-
-
-# 4.2 Average Silhouette method
-
-library(cluster)
-# k.max <- 10
-# data <- customer.data[,2:4]
-# sil <- rep(0, k.max)
-# # Compute the average silhouette width for
-# # k = 2 to k = 15
-# for(i in 2:k.max){
-#   km.res <- kmeans(data, centers = i, nstart = 25)
-#   ss <- silhouette(km.res$cluster, dist(data))
-#   sil[i] <- mean(ss[, 3])
-# }
-
-# Plot the  average silhouette width
-# plot(1:k.max, sil, type = "b", pch = 19,
-#      frame = FALSE, xlab = "Number of clusters k")
-# abline(v = which.max(sil), lty = 2)
-
-
-# 4.3 Gap Statistic method
-# set.seed(123)
-# data <- customer.data[,2:4]
-# gap_stat <- clusGap(data, FUN = kmeans, nstart = 25,K.max = 10, B = 50)
-# fviz_gap_stat(gap_stat)
-
-
-# 4.4 Using 30 different indexes
-# set.seed(123)
-# data <- customer.data[,2:4]
-# res <- NbClust(data, diss=NULL, distance = "euclidean", min.nc=2, max.nc=10, method = "kmeans" , index = "all")
-# fviz_nbclust(res) + theme_minimal()
-
-
-```
-##Processing
-```{r modeling3, eval=TRUE , warning = FALSE, message=FALSE}
-
-
-
-# 
-# # 5. K-MEAN CLUSTERING
-# 
-# 5.1 fit the model and get cluster means
-# set.seed(123)
-# data <- customer.data[,6:8]
-# fit <- kmeans(data, 5, nstart = 20) 
-# aggregate(customer.data[,2:4],by=list(fit$cluster),FUN=mean) 
-# 
-# # 5.2 Display cluster centers and give a count of data points in each cluster
-# #fit$centers 
-# table(fit$cluster) 
 
 
 
@@ -505,35 +577,13 @@ library(cluster)
 
 #What is Next
 
-+ **<span style="color:red">Explore more variables: first day of purchase, spent per category...</span>**
-+ **<span style="color:red">Inventory segmentation</span>**
-+ **<span style="color:red">Qualify the Suppliers</span>**
-+ **<span style="color:red">Employee profiles</span>**
++ **<span style="color:black">Incoporate an API to retrieve job postings automatically.</span>**
++ **<span style="color:black">Use geographic visualization to show insigths based on locations.</span>**
++ **<span style="color:black">Predict salaries by using job post data.</span>**
+
 
 ```{r next, eval=TRUE , warning = FALSE, message=FALSE }
 
-
-```
-
-#References
-
-+ Ando K. (2018). Cluster Analysis of Whisky Reviews using k-means. Retrieved from https://www.kaggle.com/koki25ando/cluster-analysis-of-whisky-reviews-using-k-means
-+ Black J. (n.d.). 3D scatter plot in R. Retrieved from https://epijim.uk/code-snippets/3Dscatter/
-+ Bukun (2018). A Forty Kaggler. Retrieved from https://www.kaggle.com/ambarish/a-forty-kaggler
-+ Chen D. (2012). Data mining for the online retail industry: A case study of RFM model-based customer segmentation using data mining. Journal of Database Marketing & Customer Strategy Management. Vol 19(3). 
-+ Fox J. (n.d.). Three-Dimensional Scatterplots And Point Identification. Retrieved from https://www.rdocumentation.org/packages/car/versions/3.0-2/topics/scatter3d
-+ GSD (2018). Who is a data scientist ?-A statistical approach. Retrieved from https://www.kaggle.com/gsdeepakkumar/who-is-a-data-scientist-a-statistical-approach
-+ Hill A. (2018). 9 Useful R Data Visualization Packages for Any Discipline. Retrieved from https://blog.modeanalytics.com/r-data-visualization-packages/
-+ Hirst T. (2015). Doodling With 3d Animated Charts in R. Retrieved from https://www.r-bloggers.com/doodling-with-3d-animated-charts-in-r/
-+ Kassambara (2018). Cluster Analysis in R Simplified and Enhanced. Retrieved from https://www.datanovia.com/en/blog/cluster-analysis-in-r-simplified-and-enhanced/
-+ Putler (n.d.). RFM Analysis For Successful Customer Segmentation. Retrieved from https://www.putler.com/rfm-analysis/#summary
-+ Qiao F . (2018). Data Exploration and Visualization with R & ggplot. Retrieved from https://towardsdatascience.com/data-exploration-and-visualization-with-r-ggplot-7f33c10ec1c
-+ Rezaeian A. (2016). Measuring Customers Satisfaction of ECommerce Sites Using Clustering Techniques: Case Study of Nyazco Website. International Journal of Management, Accounting and Economics. Vol 3(1).
-+ Sarkar D. (2018). The Art of Effective Visualization of Multi-dimensional Data. Retrieved from https://towardsdatascience.com/the-art-of-effective-visualization-of-multi-dimensional-data-6c7202990c57
-+ Stackoverflwo (2016). How to add table of contents in Rmarkdown?. Retrieved from https://stackoverflow.com/questions/23957278/how-to-add-table-of-contents-in-rmarkdown
-
-
-```{r references, eval=TRUE , warning = FALSE, message=FALSE }
 
 ```
 
