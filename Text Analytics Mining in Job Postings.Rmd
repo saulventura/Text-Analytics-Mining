@@ -415,7 +415,9 @@ barchart(key ~ rake, data = head(subset(stats, freq > 3), 20), col = "red",
 
 ```
 
-## N-gram charts
+## N-gram charts {.tabset}
+
+### Bigrams
 
 ```{r textvisualization8, eval=TRUE , warning = FALSE, message=FALSE}
 
@@ -465,6 +467,13 @@ ggplot(data=ep4.bigrams, aes(x=reorder(word, -freq), y=freq)) +
   theme(axis.text.x=element_text(angle=60, hjust=1)) +
   labs(x="Bigram", y="Frequency")
 
+
+```
+
+### Trigrams
+
+```{r textvisualization9, eval=TRUE , warning = FALSE, message=FALSE}
+
 # Most frequent trigrams 
 frequentTrigrams <- function(text){
   s.cor <- VCorpus(VectorSource(text))
@@ -490,7 +499,7 @@ ggplot(data=ep4.Trigrams, aes(x=reorder(word, -freq), y=freq)) +
 
 ## Key Data Science Tools
 
-```{r output1, eval=TRUE , warning = FALSE, message=FALSE}
+```{r textvisualization10, eval=TRUE , warning = FALSE, message=FALSE}
 
 uniqueWords = function(text) {
 text <- strsplit(text, " |,|/|;")
