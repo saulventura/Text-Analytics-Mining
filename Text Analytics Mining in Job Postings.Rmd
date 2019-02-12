@@ -119,6 +119,7 @@ library(qdap)
 library(RColorBrewer)
 library(udpipe)
 library(lattice)
+library(filematrix)
 
 ```
 
@@ -171,7 +172,7 @@ print(corpus)
 ```
 
 # Pre-Processing
-Once we have a corpus, then we need to modify the documents in it, e.g., puntuaction removal, stemming, stopword removal, etcetera.
+Once we have a corpus, then we need to modify the documents in it, e.g., **puntuaction removal, stemming, stopword removal,*** etcetera.
 
 ```{r pre-processing, eval=TRUE , warning = FALSE, message=FALSE}
 
@@ -181,14 +182,14 @@ cleanCorpus <- function(corpus){
   # Removing punctuation
   corpus.cleaned <- tm_map(corpus.cleaned, removePunctuation)
   # Looking at stop words 
-  v_stopwords <- c(stopwords("en"),"will","etc","build","using")
+  v_stopwords <- c(stopwords("en"),"will","etc","build","using","usemploymentcompliancecgicom","unless","vary","reason","routed","recruited")
   corpus.cleaned <- tm_map(corpus.cleaned, removeWords,v_stopwords )
   #Eliminating extra whitespace
   corpus.cleaned <- tm_map(corpus.cleaned, stripWhitespace)
   #Removing numbers
   corpus.cleaned <- tm_map(corpus.cleaned, removeNumbers)
   #Stemming/Lemmatizing document 
-  #corpus.cleaned <- tm_map(corpus.cleaned, lemmatize_strings)
+  #corpus.cleaned <- tm_map(corpus.cleaned, lemmatize_strings,v_stopwords)
   #Removing special characters 
   corpus.cleaned <- tm_map(corpus.cleaned, str_replace_all,"[^[:alnum:]]", " ")
   #corpus[[1]]$content
@@ -200,10 +201,11 @@ corpus <- cleanCorpus(corpus)
 ```
 
 # Creating a TDM
-Now let's create a Term Document Matrix (TDM). A term-document matrix is a mathematical matrix that describes the frequency of terms that occur in a collection of documents.
+Now let's create a ***Term Document Matrix (TDM).*** A term-document matrix is a mathematical matrix that describes the frequency of terms that occur in a collection of documents.
 [This video concisely explains what TDM is.](https://www.youtube.com/watch?v=dE10fBCDWQc){target="_blank"} 
 
-# Convert corpus into TDM
+## Convert corpus into TDM
+Also, let's **inspect** 10 terms that belong to 10 documents.
 
 ```{r tdm, eval=TRUE , warning = FALSE, message=FALSE}
 
@@ -212,11 +214,65 @@ corpustdm <- TermDocumentMatrix(corpus)
 #print(corpustdm) 
 #print(dimnames(corpustdm)$Terms)
 #dim(corpustdm)
+inspect(corpustdm[1:10,1:10])
 
-#after this, we need to convert this into traditional matrix.
+```
+
+# Text Analysis
+
+##Frequency words
+Checking the **number of terms**.
+```{r textanalysis1, eval=TRUE , warning = FALSE, message=FALSE}
+
+#collapse matrix by summing over columns
 set.seed(43)
 colS <- colSums(as.matrix(t(corpustdm)))
-wordcloud(names(colS), colS, colors = brewer.pal(6, 'Dark2'),random.order=FALSE, rot.per= 0.35, max.words = 100)
+
+#total number of terms
+length(colS)
+# create sort order (asc)
+ord <- order(colS,decreasing=TRUE)
+
+```
+
+Inspecting **most frequently** ocurring terms.
+
+```{r textanalysis12, eval=TRUE , warning = FALSE, message=FALSE}
+
+colS[head(ord)]
+
+```
+
+Inspecting **least frequently** ocurring terms.
+
+```{r textanalysis3, eval=TRUE , warning = FALSE, message=FALSE}
+
+colS[tail(ord)]
+
+```
+
+Listing terms that appear **at least 50 times**.
+
+```{r textanalysis4, eval=TRUE , warning = FALSE, message=FALSE}
+
+findFreqTerms(corpustdm, lowfreq=50)
+
+```
+
+Let's take some of the above terms and check if there is a **correlation** with other terms having a correlation coefficient of **at least 70%**.
+
+```{r textanalysis5, eval=TRUE , warning = FALSE, message=FALSE}
+
+findAssocs(corpustdm, "analysis",0.7)
+findAssocs(corpustdm, "degree",0.7)
+
+
+```
+# Text Visualization
+
+##Histogram
+```{r textvisualization1, eval=TRUE , warning = FALSE, message=FALSE}
+
 
 m <- as.matrix(corpustdm)
 corpusdf <- data.frame(m)
@@ -228,6 +284,40 @@ corpusdf <- rownames_to_column(corpusdf)
 corpusdf <- rename(corpusdf, c("rowname"="word"))
 corpusdf$wordcount <- rowSums(corpusdf[-1])
 corpusdf <- corpusdf[order(-corpusdf$wordcount),]
+
+
+
+#plotting histogram
+ggplot(subset(corpusdf, wordcount>43), aes(reorder(word, -wordcount), wordcount)) +
+   geom_bar(stat = "identity", fill = "darkgreen", alpha = 0.7) +
+  xlab("Words with the highest frequency") +
+  ylab("Frequency") +
+  ggtitle("Understanding word frequencies") +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=60, hjust=0.9), plot.title = element_text(hjust=0.5)) +
+ scale_fill_brewer() 
+
+
+```
+
+## Top 10 words
+```{r textvisualization2, eval=TRUE , warning = FALSE, message=FALSE}
+
+pal <- colorRampPalette(colors = c("darkgreen", "lightgreen"))(10)
+
+barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,
+         main ="Top 10 Most Frequent Words",
+        ylab = "Frequency", col = pal,  border = NA)
+
+
+```
+
+## WordClouds
+```{r textvisualization3, eval=TRUE , warning = FALSE, message=FALSE}
+
+# wordcloud(names(colS), colS, colors = brewer.pal(6, 'Dark2'),random.order=FALSE, rot.per= 0.35, max.words = 100)
+
+
 
 #since all the rows are same and numeric,we can add them up to get the total value
 #sort it based on the number
@@ -242,30 +332,10 @@ wordcloud(word=corpusdf$word, freq= corpusdf$wordcount,  colors = brewer.pal(6, 
 
 ```
 
-# Crea....
+## Universal Word Classes {.tabset}
 
-```{r tdm1, eval=TRUE , warning = FALSE, message=FALSE}
-
-
-
-
-
-
-#plotting words which have more than a count of 1000
-ggplot(subset(corpusdf, wordcount>30), aes(reorder(word, -wordcount), wordcount)) +
-  geom_bar(stat="identity") +
-  xlab("Words with the highest frequency") +
-  ylab("Frequency") +
-  ggtitle("Understanding word frequencies") +
-  theme(axis.text.x=element_text(angle=90, hjust=0.9))
-
-
-barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,
-        col ="lightgreen", main ="Most frequent words",
-        ylab = "Word frequencies")
-
-
-
+### Universal Parts of Speech
+```{r textvisualization4, eval=TRUE , warning = FALSE, message=FALSE}
 
 
 
@@ -284,12 +354,24 @@ barchart(key ~ freq, data = stats, col = "lightgreen",
          main = "UPOS (Universal Parts of Speech)\n frequency of occurrence", 
          xlab = "Freq")
 
+
+```
+
+### Adjectives
+```{r textvisualization5, eval=TRUE , warning = FALSE, message=FALSE}
+
 ## ADJECTIVES
 stats <- subset(x, upos %in% c("ADJ")) 
 stats <- txt_freq(stats$token)
 stats$key <- factor(stats$key, levels = rev(stats$key))
 barchart(key ~ freq, data = head(stats, 20), col = "purple", 
          main = "Most occurring adjectives", xlab = "Freq")
+
+```
+
+### Nouns
+```{r textvisualization6, eval=TRUE , warning = FALSE, message=FALSE}
+
 
 ## NOUNS
 stats <- subset(x, upos %in% c("VERB")) 
@@ -298,6 +380,14 @@ stats$key <- factor(stats$key, levels = rev(stats$key))
 barchart(key ~ freq, data = head(stats, 20), col = "gold", 
          main = "Most occurring Verbs", xlab = "Freq")
 
+```
+
+## RAKE chart
+
+Rapid Automatic Keyword Extraction **(RAKE)** is an algorithm to automatically extract keywords from documents. 
+[More info here.](https://www.thinkinfi.com/2018/09/keyword-extraction-using-rake-in-python.html){target="_blank"} 
+
+```{r textvisualization7, eval=TRUE , warning = FALSE, message=FALSE}
 
 ## Using RAKE
 #Rapid Automatic Keyword Extraction (RAKE) is an algorithm to automatically extract keywords from documents.
@@ -311,18 +401,23 @@ barchart(key ~ rake, data = head(subset(stats, freq > 3), 20), col = "red",
          xlab = "Rake")
 
 
-## Using a sequence of POS tags (noun phrases / verb phrases)
-x$phrase_tag <- as_phrasemachine(x$upos, type = "upos")
-stats <- keywords_phrases(x = x$phrase_tag, term = tolower(x$token), 
-                          pattern = "(A|N)*N(P+D*(A|N)*N)*", 
-                          is_regex = TRUE, detailed = FALSE)
-stats <- subset(stats, ngram > 1 & freq > 3)
-stats$key <- factor(stats$keyword, levels = rev(stats$keyword))
-barchart(key ~ freq, data = head(stats, 20), col = "magenta", 
-         main = "Keywords - simple noun phrases", xlab = "Frequency")
+# ## Using a sequence of POS tags (noun phrases / verb phrases)
+# x$phrase_tag <- as_phrasemachine(x$upos, type = "upos")
+# stats <- keywords_phrases(x = x$phrase_tag, term = tolower(x$token), 
+#                           pattern = "(A|N)*N(P+D*(A|N)*N)*", 
+#                           is_regex = TRUE, detailed = FALSE)
+# stats <- subset(stats, ngram > 1 & freq > 3)
+# stats$key <- factor(stats$keyword, levels = rev(stats$keyword))
+# barchart(key ~ freq, data = head(stats, 20), col = "magenta", 
+#          main = "Keywords - simple noun phrases", xlab = "Frequency")
+# 
 
 
+```
 
+## N-gram charts
+
+```{r textvisualization8, eval=TRUE , warning = FALSE, message=FALSE}
 
 
 library(dplyr) 
@@ -385,7 +480,7 @@ frequentTrigrams <- function(text){
 # Most frequent trigrams
 ep4.Trigrams <- frequentTrigrams(data.text$Description)[1:20,]
 ggplot(data=ep4.Trigrams, aes(x=reorder(word, -freq), y=freq)) +  
-  geom_bar(stat="identity", fill="chocolate2", colour="black") +
+  geom_bar(stat="identity", fill="midnightblue", colour="black") +
   theme_bw() +
   theme(axis.text.x=element_text(angle=60, hjust=1)) +
   labs(x="Trigram", y="Frequency")
@@ -393,9 +488,7 @@ ggplot(data=ep4.Trigrams, aes(x=reorder(word, -freq), y=freq)) +
 
 ```
 
-## Output {.tabset}
-
-### Key Data Science Tools
+## Key Data Science Tools
 
 ```{r output1, eval=TRUE , warning = FALSE, message=FALSE}
 
@@ -437,138 +530,24 @@ ggplot(data=n, aes(x= reorder(n$toolname,-frequency), y=n$frequency, fill = n$to
 
 
 
-
-
-```
-
-### D
-
-```{r output2, eval=TRUE , warning = FALSE, message=FALSE}
-
-
-```
-
-### N
-
-```{r output3, eval=TRUE , warning = FALSE, message=FALSE}
-
-
-```
-
-# Data Modeling
-
-##K
-
-Basically, <span style="color:red">it works like this...</span>
-
-
-```{r modeling1, eval=TRUE , warning = FALSE, message=FALSE , include = FALSE}
-#ANIMATION
-# set.seed(2345)
-# library(animation)
-# ani.options(interval = 0.05)
-# kmeans.ani(preprocessed[1:2], centers =3)
-
-
-
-
-
 ```
 
 # Results
 
-##2D plot
+##Findings
+
+Although is very well known that **coding** and **visualization** tools knowledge are fundamental to supports data scientists in their performance of tasks, results demonstrates that **Big Data tools** are gaining ground for virtually every data scientist position. Therefore, Big Data is **not anymore** only associated to **Data Engineers roles exclusively**.
+
+<center><img src="results.jpg" ></center>
 ```{r results1, eval=TRUE , warning = FALSE, message=FALSE }
 
 # 5.3 Plot the model
-#clusplot(data, fit$cluster, color=TRUE, shade=TRUE, Expllabels=2, lines=0)
 
-# fviz_cluster(fit, data = data)
-# 
-# 
-# # Add cluster membership to customers dataset
-# customer.data$cluster <- fit$cluster
-# customer.data$cluster  <- factor(customer.data$cluster, levels = c(1:5))
-
-##2D plot
-```
-##3D plot
-```{r results2, eval=TRUE , warning = FALSE, message=FALSE }
-
-#######################
-# Plot clusters in 3D #
-#######################
-# 
-# colors <- c('red','orange','green3','deepskyblue','blue','darkorchid4','violet','pink1','tan3','black')
-# scatter3d(x = customer.data$number.pur.z, 
-#           y = customer.data$money.spent.z,
-#           z = customer.data$days.sl.pur.z, 
-#           groups = customer.data$cluster,
-#           xlab = "Frequency (z)", 
-#           ylab = "Monetary Value (z)",
-#           zlab = "Recency (z)",
-#           surface.col = colors,
-#           box=FALSE,angle =80,
-#           axis.scales = FALSE,
-#           surface = TRUE, # produces the horizonal planes through the graph at each level of monetary value
-#           fit = "smooth",
-#           #     ellipsoid = TRUE, # to graph ellipses uses this command and set "surface = " to FALSE
-#           grid = TRUE,
-#           axis.col = c("black", "black", "black"))
-# 
-# 
-# 
-# 
-# 
-# scatter3d(x = customer.data$money.spent.z, 
-#           y = customer.data$number.pur.z,
-#           z = customer.data$days.sl.pur.z,
-#           groups = customer.data$cluster,
-#           xlab = "Monetary Value (z)", 
-#           ylab = "Frequency (z)",
-#           zlab = "Recency (z)",
-#           surface.col = colors,
-#           axis.scales = FALSE,
-#           surface = TRUE, # produces the horizonal planes through the graph at each level of monetary value
-#           fit = "smooth",
-#           #     ellipsoid = TRUE, # to graph ellipses uses this command and set "surface = " to FALSE
-#           grid = TRUE,
-#           axis.col = c("black", "black", "black"))
 
 
 ```
 
-
-##Labeling
-```{r labeling, eval=TRUE , warning = FALSE, message=FALSE }
-# 
-# count_cluster <- as.data.frame(table(fit$cluster))
-# colnames (count_cluster ) <- c("Group.1","Customers")
-# df <- aggregate(customer.data[,2:4],by=list(fit$cluster),FUN=mean) 
-# df <- merge (df, count_cluster, by = "Group.1")
-# 
-# 
-# colnames (df) <- c("Cluster","Days since last purchase","Number of purchases","Money spent","Customers")
-# df$`Days since last purchase` <- round(df$`Days since last purchase`)
-# df$`Number of purchases` <- round(df$`Number of purchases` )
-# df$`Money spent` <- round(df$`Money spent`)
-# 
-# d <- head(df)
-# 
-# tt3 <- ttheme_minimal(
-#   core=list(bg_params = list(fill = blues9[1:4], col=NA),
-#             fg_params=list(fontface=3)),
-#   colhead=list(fg_params=list(col="navyblue", fontface=4L)),
-#   rowhead=list(fg_params=list(col="orange", fontface=3L)))
-# 
-# 
-# grid.arrange(tableGrob(d, theme=tt3), nrow=1)
-
-
-```
-
-##Findings
-
+##Suggestions
 
 ```{r labeling3, eval=TRUE , warning = FALSE, message=FALSE }
 # test
