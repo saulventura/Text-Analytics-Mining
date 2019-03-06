@@ -559,7 +559,11 @@ Although is very well known that **coding** and **visualization** tools knowledg
 ##Suggestions
 
 ```{r labeling3, eval=TRUE , warning = FALSE, message=FALSE }
-# test
+
++ **<span style="color:black">Incoporate an API to retrieve job postings automatically.</span>**
++ **<span style="color:black">Use geographic visualization to show insigths based on locations.</span>**
++ **<span style="color:black">Predict salaries by using job post data.</span>**
+
 
 ```
 
